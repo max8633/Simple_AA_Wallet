@@ -9,7 +9,7 @@ import {Initializable} from "lib/openzeppelin-contracts/contracts/proxy/utils/In
 import {UUPSUpgradeable} from "lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {TokenCallbackHandler} from "lib/account-abstraction/contracts/samples/callback/TokenCallbackHandler.sol";
 
-contract wallet is
+abstract contract Wallet is
     BaseAccount,
     Initializable,
     UUPSUpgradeable,
@@ -49,7 +49,7 @@ contract wallet is
         UserOperation calldata userOp,
         bytes32 userOpHash
     ) internal view override returns (uint256) {
-        bytes32 hash = userOpHash.toEthSignedMessageHash();
+        bxytes32 hash = userOpHash.toEthSignedMessageHash();
         bytes[] memory signatures = abi.decode(userOp.signature, (bytes[]));
 
         for (uint256 i = 0; i < owners.length; i++) {
@@ -89,9 +89,9 @@ contract wallet is
     }
 
     function executeBatch(
-        address[] calldata target,
-        uint256[] calldata value,
-        bytes[] calldata data
+        address[] calldata targets,
+        uint256[] calldata values,
+        bytes[] calldata datas
     ) external _requireCalledByEntryPointOrWalletFactory {
         require(targets.length == datas.length, "wrong targets length");
         require(values.length == datas.length, "wrong values length");
