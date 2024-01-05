@@ -8,18 +8,21 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 import {Initializable} from "lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {TokenCallbackHandler} from "lib/account-abstraction/contracts/samples/callback/TokenCallbackHandler.sol";
+import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 abstract contract Wallet is
     BaseAccount,
     Initializable,
     UUPSUpgradeable,
-    TokenCallbackHandler
+    TokenCallbackHandler,
+    ReentrancyGuard
 {
-    using ECDSA for bytes32;
+    // using ECDSA for bytes32;
 
     address[] public owners;
 
     address public immutable walletFactory;
+
     IEntryPoint private immutable _entryPoint;
 
     event WalletInitialized(IEntryPoint indexed entryPoint, address[] owners);
@@ -32,9 +35,9 @@ abstract contract Wallet is
         _;
     }
 
-    constructor(IEntryPoint myEntryPoint, address myWalletFactory_) {
-        _entryPoint = myEntryPoint;
-        walletFactory = myWalletFactory_;
+    constructor(IEntryPoint EntryPoint, address WalletFactory_) {
+        _entryPoint = EntryPoint;
+        walletFactory = WalletFactory_;
     }
 
     function _authorizeUpgrade(
@@ -49,7 +52,7 @@ abstract contract Wallet is
         UserOperation calldata userOp,
         bytes32 userOpHash
     ) internal view override returns (uint256) {
-        bxytes32 hash = userOpHash.toEthSignedMessageHash();
+        bytes32 hash = ECDSA.toEthSignedMessageHash(userOpHash);
         bytes[] memory signatures = abi.decode(userOp.signature, (bytes[]));
 
         for (uint256 i = 0; i < owners.length; i++) {
