@@ -11,8 +11,6 @@ import {Counter} from "src/Counter.sol";
 contract WalletTest is Helper {
     function setUp() public override {
         super.setUp();
-
-        address[] memory a;
     }
 
     function testReceive() public {
@@ -27,14 +25,159 @@ contract WalletTest is Helper {
         assertEq(alice.balance, 0);
     }
 
-    // function testSubmitTransactionByOwner() public {
-    //     vm.startPrank(owners[0]);
+    function testSubmitSingleTransactionByOwner() public {
+        vm.startPrank(owners[0]);
+        (
+            address[] memory toSingle,
+            uint256[] memory valueSingle,
+            bytes[] memory dataSingle
+        ) = singleTransactionSetUp();
+        uint256 txnId = wallet.submitTransaction(
+            toSingle,
+            valueSingle,
+            dataSingle
+        );
+        vm.stopPrank();
+        assertEq(txnId, 1);
 
-    //     uint256 txnId = wallet.submitTransaction(to, value, data);
-    //     vm.stopPrank();
+        (
+            address[] memory to,
+            uint256[] memory value,
+            bytes[] memory data,
+            bool[] memory executed,
+            uint256[] memory transactionId
+        ) = wallet.getTransactionInfo(1);
 
-    //     assertEq(txnId, 0);
-    // }
+        assertEq(to[0], address(counter));
+        assertEq(value[0], 0);
+        assertEq(data[0], abi.encodeCall(counter.increment, ()));
+    }
+
+    function testConfirmSingleTransaction() public {
+        vm.startPrank(owners[0]);
+        (
+            address[] memory to,
+            uint256[] memory value,
+            bytes[] memory data
+        ) = singleTransactionSetUp();
+        uint256 txnId = wallet.submitTransaction(to, value, data);
+        vm.stopPrank();
+
+        vm.startPrank(owners[1]);
+        wallet.confirmTransaction(1);
+
+        uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
+
+        assertEq(confirmednum, 2);
+    }
+
+    function testExecuteSingleTransaction() public {
+        vm.startPrank(owners[0]);
+        (
+            address[] memory to,
+            uint256[] memory value,
+            bytes[] memory data
+        ) = singleTransactionSetUp();
+        uint256 txnId = wallet.submitTransaction(to, value, data);
+        vm.stopPrank();
+
+        vm.prank(owners[1]);
+        wallet.confirmTransaction(1);
+
+        vm.startPrank(owners[2]);
+        wallet.confirmTransaction(1);
+
+        uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
+        assertEq(confirmednum, 3);
+
+        bool success = wallet.executeTransaction(1);
+        require(success == true, "execute transaction fail");
+        assertEq(counter.number(), 1);
+        assertEq(address(counter).balance, 0);
+    }
+
+    function testSubmitBatchTransactionByOwner() public {
+        vm.startPrank(owners[0]);
+        (
+            address[] memory toBatch,
+            uint256[] memory valueBatch,
+            bytes[] memory dataBatch
+        ) = batchTransactionSetUp();
+        uint256 txnId = wallet.submitTransaction(
+            toBatch,
+            valueBatch,
+            dataBatch
+        );
+        vm.stopPrank();
+        assertEq(txnId, 1);
+
+        (
+            address[] memory to,
+            uint256[] memory value,
+            bytes[] memory data,
+            bool[] memory executed,
+            uint256[] memory transactionId
+        ) = wallet.getTransactionInfo(1);
+
+        assertEq(to[0], address(counter));
+        assertEq(value[0], 0);
+        assertEq(data[0], abi.encodeCall(counter.increment, ()));
+        assertEq(to[1], address(counter));
+        assertEq(value[1], 0);
+        assertEq(data[1], abi.encodeCall(counter.increment, ()));
+    }
+
+    function testConfirmBatchTransaction() public {
+        vm.startPrank(owners[0]);
+        (
+            address[] memory toBatch,
+            uint256[] memory valueBatch,
+            bytes[] memory dataBatch
+        ) = batchTransactionSetUp();
+        uint256 txnId = wallet.submitTransaction(
+            toBatch,
+            valueBatch,
+            dataBatch
+        );
+        vm.stopPrank();
+
+        vm.startPrank(owners[1]);
+        wallet.confirmTransaction(1);
+
+        uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
+        assertEq(confirmednum, 2);
+
+        vm.stopPrank();
+    }
+
+    function testExecuteBatchTransaction() public {
+        vm.startPrank(owners[0]);
+        (
+            address[] memory toBatch,
+            uint256[] memory valueBatch,
+            bytes[] memory dataBatch
+        ) = batchTransactionSetUp();
+        uint256 txnId = wallet.submitTransaction(
+            toBatch,
+            valueBatch,
+            dataBatch
+        );
+        vm.stopPrank();
+
+        vm.prank(owners[1]);
+        wallet.confirmTransaction(1);
+
+        vm.startPrank(owners[2]);
+        wallet.confirmTransaction(1);
+
+        uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
+        assertEq(confirmednum, 3);
+
+        bool success = wallet.executeTransaction(1);
+        require(success == true, "execute transaction fail");
+        assertEq(counter.number(), 2);
+        assertEq(address(counter).balance, 0);
+    }
 
     function testInitiateRecovery() public {
         address newOwner = makeAddr("newOwner");
@@ -91,6 +234,24 @@ contract WalletTest is Helper {
         assertEq(wallet.isOwner(newOwner), true);
     }
 
+    function testCancelRecovery() public {
+        address newOwner = makeAddr("newOwner");
+        vm.startPrank(gurdians[0]);
+        wallet.initialRecovery(owners[0], newOwner);
+        assertEq(wallet.isRecovery(), true);
+        vm.stopPrank();
+
+        vm.startPrank(owners[0]);
+        wallet.cancelRecovery();
+        assertEq(wallet.isRecovery(), false);
+        vm.stopPrank();
+
+        vm.startPrank(gurdians[1]);
+        vm.expectRevert();
+        wallet.supportRecovery(owners[0], newOwner);
+        vm.stopPrank();
+    }
+
     function testInitiateGurdianRemoval() public {
         vm.startPrank(owners[0]);
 
@@ -121,7 +282,10 @@ contract WalletTest is Helper {
         vm.prank(owners[2]);
         wallet.supportGurdianRemoval(gurdians[2]);
 
-        assertEq(gurdians[2], address(0));
+        uint256 walletGurdiansLength = wallet.executeGurdianRemoval(
+            gurdians[2]
+        );
+        assertEq(walletGurdiansLength, wallet.threshold());
     }
 
     function testInitiateGurdianUpdate() public {
@@ -133,19 +297,19 @@ contract WalletTest is Helper {
         assertEq(wallet.inGurdianUpdate(), true);
     }
 
-    // function testSupportGurdianUpdate() public {
-    //     address newGurdian = makeAddr("newGurdian");
+    function testSupportGurdianUpdate() public {
+        address newGurdian = makeAddr("newGurdian");
 
-    //     vm.prank(owners[0]);
-    //     wallet.initiateGurdianUpdate(gurdians[0], newGurdian);
+        vm.prank(owners[0]);
+        wallet.initiateGurdianUpdate(gurdians[0], newGurdian);
 
-    //     vm.prank(owners[1]);
-    //     wallet.supportGurdianUpdate(gurdians[0], newGurdian);
+        vm.prank(owners[1]);
+        wallet.supportGurdianUpdate(gurdians[0], newGurdian);
 
-    //     assertEq(wallet.supportToGurdianUpdate(), 2);
-    // }
+        assertEq(wallet.supportToGurdianUpdate(), 2);
+    }
 
-    function testSupportThenExecuteGurdianUpdate() public {
+    function testExecuteGurdianUpdate() public {
         address newGurdian = makeAddr("newGurdian");
 
         vm.prank(owners[0]);
@@ -166,5 +330,6 @@ contract WalletTest is Helper {
 
         assertEq(wallet.inGurdianUpdate(), false);
         assertEq(walletGurdians[0], newGurdian);
+        assertEq(wallet.isGurdian(newGurdian), true);
     }
 }
