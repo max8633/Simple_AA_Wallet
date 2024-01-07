@@ -379,7 +379,7 @@ contract Wallet is
         address oldOwner,
         address newOwner,
         address[] calldata gurdiansList
-    ) external onlyGurdians onlyInRecovery {
+    ) external onlyGurdians onlyInRecovery returns (address[] memory) {
         require(
             block.timestamp > executeRecoveryTimestamp[currentRecoveryRound],
             "not the time to execute recovery"
@@ -416,6 +416,7 @@ contract Wallet is
         }
 
         isRecovery = false;
+        return owners;
     }
 
     bool public inGurdianUpdate;
@@ -508,23 +509,31 @@ contract Wallet is
     function executeGurdianUpdate(
         address oldGurdian,
         address newGurdian
-    ) external {
-        // isGurdian[oldGurdian] = false;
-        // if (
-        //     supportToGurdianUpdate == owners.length &&
-        //     block.timestamp >= gurdianToUpdateTimestamp[newGurdian]
-        // ) {
-        for (uint256 i = 0; i < gurdians.length; i++) {
-            console2.log(i);
-            if (gurdians[i] == oldGurdian) {
-                console2.log("hello");
+    ) external returns (address[] memory) {
+        isGurdian[oldGurdian] = false;
+        if (
+            supportToGurdianUpdate == owners.length &&
+            block.timestamp >= gurdianToUpdateTimestamp[newGurdian]
+        ) {
+            for (uint256 i = 0; i < gurdians.length; i++) {
+                if (gurdians[i] == oldGurdian) {
+                    gurdians[i] = newGurdian;
+                    inGurdianUpdate = false;
+                    return gurdians;
+                }
             }
         }
-
-        // inGurdianUpdate = false;
     }
 
     function getGurdians() public view returns (address[] memory) {
         return gurdians;
+    }
+
+    function getOwners() public view returns (address[] memory) {
+        return owners;
+    }
+
+    function isOwner(address owner) public view returns (bool) {
+        return isOwners[owner];
     }
 }

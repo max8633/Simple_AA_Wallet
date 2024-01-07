@@ -80,10 +80,15 @@ contract WalletTest is Helper {
         vm.warp(block.timestamp + 5 days);
 
         vm.startPrank(gurdians[0]);
-        wallet.executeRecovery(owners[0], newOwner, gurdians);
+        address[] memory walletOwners = wallet.executeRecovery(
+            owners[0],
+            newOwner,
+            gurdians
+        );
 
-        // assertEq(owners[0], newOwner);
+        assertEq(walletOwners[0], newOwner);
         assertEq(wallet.isRecovery(), false);
+        assertEq(wallet.isOwner(newOwner), true);
     }
 
     function testInitiateGurdianRemoval() public {
@@ -140,31 +145,26 @@ contract WalletTest is Helper {
     //     assertEq(wallet.supportToGurdianUpdate(), 2);
     // }
 
-    // function testSupportThenExecuteGurdianUpdate() public {
-    //     address newGurdian = makeAddr("newGurdian");
-
-    //     vm.prank(owners[0]);
-    //     wallet.initiateGurdianUpdate(wallet.gurdians[0], newGurdian);
-
-    //     vm.prank(owners[1]);
-    //     wallet.supportGurdianUpdate(wallet.gurdians[0], newGurdian);
-
-    //     vm.warp(block.timestamp + 5 days);
-
-    //     vm.prank(owners[2]);
-    //     wallet.supportGurdianUpdate(wallet.gurdians[0], newGurdian);
-    //     wallet.executeGurdianUpdate(wallet.gurdians[0], newGurdian);
-
-    //     assertEq(wallet.inGurdianUpdate(), false);
-    //     assertEq(wallet.gurdians[0], newGurdian);
-    // }
-
-    function testA() public {
+    function testSupportThenExecuteGurdianUpdate() public {
         address newGurdian = makeAddr("newGurdian");
-        console2.log("a:", newGurdian);
-        address[] memory walletGurdians = wallet.getGurdians();
-        wallet.executeGurdianUpdate(walletGurdians[0], newGurdian);
-        console2.log(gurdians[0], walletGurdians[0]);
+
+        vm.prank(owners[0]);
+        wallet.initiateGurdianUpdate(gurdians[0], newGurdian);
+
+        vm.prank(owners[1]);
+        wallet.supportGurdianUpdate(gurdians[0], newGurdian);
+
+        vm.warp(block.timestamp + 5 days);
+
+        vm.prank(owners[2]);
+
+        wallet.supportGurdianUpdate(gurdians[0], newGurdian);
+        address[] memory walletGurdians = wallet.executeGurdianUpdate(
+            gurdians[0],
+            newGurdian
+        );
+
+        assertEq(wallet.inGurdianUpdate(), false);
         assertEq(walletGurdians[0], newGurdian);
     }
 }
