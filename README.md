@@ -5,5 +5,5 @@
 
 ## features
 1. ERC-4337 
-2. MultiSig features
-3. Social Recovery
+2. MultiSig
+4. Social Recovery
