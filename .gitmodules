@@ -7,3 +7,6 @@
 [submodule "lib/account-abstraction"]
 	path = lib/account-abstraction
 	url = https://github.com/eth-infinitism/account-abstraction
+[submodule "lib/ERC4337-sample"]
+	path = lib/ERC4337-sample
+	url = https://github.com/Doge-is-Dope/ERC4337-sample

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "forge-std/Test.sol";
+
 import {IEntryPoint} from "lib/account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {BaseAccount} from "lib/account-abstraction/contracts/core/BaseAccount.sol";
 import {UserOperation} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
@@ -67,11 +69,11 @@ contract Wallet is
     //@notice store gurdians threshold
     uint256 public threshold;
 
-    //@notice owners of the wallet
+    //@notice gurdians of the wallet
     address[] public gurdians;
 
     //@notice check owner address cant use for twice
-    mapping(address => bool) internal noLongerOwners;
+    mapping(address => bool) public noLongerOwners;
 
     //@notice check is address is owners
     mapping(address => bool) public isOwners;
@@ -79,8 +81,8 @@ contract Wallet is
     //@notice store the time a new recovery process initiate
     mapping(uint256 => uint256) public executeRecoveryTimestamp;
 
-    //@notice store the time stamp when gurdian removal process is initiate
-    mapping(address => uint256) public gurdianToRemovalTimestamp;
+    //@notice store the time stamp when gurdian update process is initiate
+    mapping(address => uint256) public gurdianToUpdateTimestamp;
 
     //@notice check if in recovery
     bool public isRecovery;
@@ -156,12 +158,17 @@ contract Wallet is
     }
 
     function initialize(
-        address[] memory initialOwners,
-        uint256 numOfConfirmRequired,
-        address[] memory gurdians,
-        uint256 threshold
+        address[] memory _initialOwners,
+        uint256 _numOfConfirmRequired,
+        address[] memory _gurdians,
+        uint256 _threshold
     ) public initializer {
-        _initialize(initialOwners, numOfConfirmRequired, gurdians, threshold);
+        _initialize(
+            _initialOwners,
+            _numOfConfirmRequired,
+            _gurdians,
+            _threshold
+        );
     }
 
     function _initialize(
@@ -180,10 +187,11 @@ contract Wallet is
         for (uint256 i = 0; i < _initialOwners.length; i++) {
             require(_initialOwners[i] != address(0), "invalid owner");
             owners.push(_initialOwners[i]);
+            isOwners[owners[i]] = true;
         }
 
         for (uint256 i = 0; i < _gurdians.length; i++) {
-            gurdians[i] = _gurdians[i];
+            gurdians.push(_gurdians[i]);
             isGurdian[gurdians[i]] = true;
         }
 
@@ -235,7 +243,7 @@ contract Wallet is
         address[] calldata _to,
         uint256[] calldata _value,
         bytes[] calldata _data
-    ) external onlyOwners {
+    ) external onlyOwners returns (uint256 txnId) {
         currentTransationNum++;
         for (uint256 i = 0; i < _to.length; i++) {
             require(_to[i] != address(0), "Invalid target address");
@@ -250,6 +258,7 @@ contract Wallet is
                 })
             );
         }
+        return currentTransationNum;
     }
 
     function confirmTransaction(uint256 _transactionId) external onlyOwners {
@@ -353,6 +362,15 @@ contract Wallet is
         );
     }
 
+    function getRecoveryInfo() external returns (address, uint256, bool) {
+        Recovery memory rcInfo = recoveryInfo[msg.sender];
+        return (
+            rcInfo.newOwnerAddr,
+            rcInfo.recoveryRound,
+            rcInfo.usedInExecuteRecovery
+        );
+    }
+
     function cancelRecovery() external onlyOwners onlyInRecovery {
         isRecovery = false;
     }
@@ -388,10 +406,10 @@ contract Wallet is
             recoveryInfo[gurdiansList[i]].usedInExecuteRecovery = true;
         }
 
-        for (uint256 i = 0; i < owners.length; i++) {
+        for (uint256 i = 0; i < 3; i++) {
             if (owners[i] == oldOwner) {
-                isOwners[oldOwner] = false;
                 owners[i] = newOwner;
+                isOwners[oldOwner] = false;
                 isOwners[newOwner] = true;
                 noLongerOwners[oldOwner] = true;
             }
@@ -402,7 +420,7 @@ contract Wallet is
 
     bool public inGurdianUpdate;
     mapping(address => bool) gurdianUpdate;
-    mapping(address => bool) isSupport;
+    mapping(address => mapping(address => bool)) isSupport;
 
     modifier notInGurdianUpdate() {
         require(!inGurdianUpdate, "one gurdian is in update mode now");
@@ -417,37 +435,32 @@ contract Wallet is
             gurdianToRemoval != address(0),
             "Invalid gurdian address to be removed"
         );
-        require(
-            !gurdianUpdate[gurdianToRemoval],
-            "can update one gurdian at the same time"
-        );
         require(isGurdian[gurdianToRemoval], "not a gurdian");
         require(!isOwners[gurdianToRemoval], "owner cant not be gurdian");
-        gurdianToRemovalTimestamp[gurdianToRemoval] = block.timestamp + 3 days;
+        gurdianToUpdateTimestamp[gurdianToRemoval] = block.timestamp + 3 days;
         gurdianUpdate[gurdianToRemoval] = true;
+        isSupport[msg.sender][gurdianToRemoval] = true;
         inGurdianUpdate = true;
     }
+
+    uint256 public supportToGurdianRemoval;
 
     function supportGurdianRemoval(
         address gurdianToRemoval
     ) external onlyOwners notInRecovery {
-        require(
-            gurdianUpdate[gurdianToRemoval],
-            "the gurdian you supported is not in update mode"
-        );
-        isSupport[msg.sender] = true;
+        isSupport[msg.sender][gurdianToRemoval] = true;
 
-        uint256 supportToGurdianRemoval;
         for (uint256 i = 0; i < owners.length; i++) {
-            if (isSupport[owners[i]]) {
+            if (isSupport[owners[i]][gurdianToRemoval]) {
                 supportToGurdianRemoval++;
             }
         }
         if (
             supportToGurdianRemoval == owners.length &&
-            block.timestamp >= gurdianToRemovalTimestamp[gurdianToRemoval]
+            block.timestamp >= gurdianToUpdateTimestamp[gurdianToRemoval]
         ) {
             executeGurdianRemoval(gurdianToRemoval);
+            supportToGurdianRemoval = 0;
         }
     }
 
@@ -459,5 +472,59 @@ contract Wallet is
                 gurdians.pop();
             }
         }
+        inGurdianUpdate = false;
+    }
+
+    function initiateGurdianUpdate(
+        address oldGurdian,
+        address newGurdian
+    ) external onlyOwners notInRecovery notInGurdianUpdate {
+        require(
+            oldGurdian != address(0) && newGurdian != address(0),
+            "Invalid address"
+        );
+        require(isGurdian[oldGurdian], "not a gurdian");
+        require(!isGurdian[newGurdian], "already a gurdian");
+        require(!isOwners[newGurdian], "owner cant not be gurdian");
+        gurdianToUpdateTimestamp[newGurdian] = block.timestamp + 3 days;
+        isSupport[msg.sender][oldGurdian] = true;
+        inGurdianUpdate = true;
+    }
+
+    uint256 public supportToGurdianUpdate;
+
+    function supportGurdianUpdate(
+        address oldGurdian,
+        address newGurdian
+    ) external onlyOwners notInRecovery {
+        isSupport[msg.sender][oldGurdian] = true;
+        for (uint256 i = 0; i < owners.length; i++) {
+            if (isSupport[owners[i]][oldGurdian]) {
+                supportToGurdianUpdate++;
+            }
+        }
+    }
+
+    function executeGurdianUpdate(
+        address oldGurdian,
+        address newGurdian
+    ) external {
+        // isGurdian[oldGurdian] = false;
+        // if (
+        //     supportToGurdianUpdate == owners.length &&
+        //     block.timestamp >= gurdianToUpdateTimestamp[newGurdian]
+        // ) {
+        for (uint256 i = 0; i < gurdians.length; i++) {
+            console2.log(i);
+            if (gurdians[i] == oldGurdian) {
+                console2.log("hello");
+            }
+        }
+
+        // inGurdianUpdate = false;
+    }
+
+    function getGurdians() public view returns (address[] memory) {
+        return gurdians;
     }
 }
