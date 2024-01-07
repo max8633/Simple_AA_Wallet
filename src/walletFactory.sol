@@ -16,9 +16,15 @@ contract WalletFactory {
 
     function getAddress(
         address[] memory owners,
+        uint256 numOfConfirmRequired,
+        address[] memory gurdians,
+        uint256 threshold,
         uint256 salt
     ) public view returns (address) {
-        bytes memory walletInit = abi.encodeCall(Wallet.initialize, owners);
+        bytes memory walletInit = abi.encodeCall(
+            Wallet.initialize,
+            (owners, numOfConfirmRequired, gurdians, threshold)
+        );
         bytes memory proxyConstructor = abi.encode(
             address(walletImplementation),
             walletInit
@@ -34,13 +40,25 @@ contract WalletFactory {
 
     function createAccount(
         address[] memory owners,
+        uint256 numOfConfirmRequired,
+        address[] memory gurdians,
+        uint256 threshold,
         uint256 salt
     ) external returns (Wallet) {
-        address addr = getAddress(owners, salt);
+        address addr = getAddress(
+            owners,
+            numOfConfirmRequired,
+            gurdians,
+            threshold,
+            salt
+        );
         if (addr.code.length > 0) {
             return Wallet(payable(addr));
         } else {
-            bytes memory walletInit = abi.encodeCall(Wallet.initialize, owners);
+            bytes memory walletInit = abi.encodeCall(
+                Wallet.initialize,
+                (owners, numOfConfirmRequired, gurdians, threshold)
+            );
             ERC1967Proxy proxy = new ERC1967Proxy{salt: bytes32(salt)}(
                 address(walletImplementation),
                 walletInit
