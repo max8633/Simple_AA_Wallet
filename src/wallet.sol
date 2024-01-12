@@ -166,11 +166,14 @@ contract Wallet is
         bytes32 hash = userOpHash.toEthSignedMessageHash();
         bytes[] memory signatures = abi.decode(userOp.signature, (bytes[]));
 
-        for (uint256 i = 0; i < owners.length; i++) {
-            if (owners[i] != hash.recover(signatures[i]))
-                return SIG_VALIDATION_FAILED;
+        for (uint256 i = 0; i < signatures.length; i++) {
+            address recOwner = hash.recover(signatures[i]);
+            for (uint256 j = 0; j < owners.length; j++) {
+                if (owners[i] == recOwner) return 0;
+            }
+            // if (owners[i] != hash.recover(signatures[i]))
+            return SIG_VALIDATION_FAILED;
         }
-        return 0;
     }
 
     function initialize(
@@ -178,7 +181,7 @@ contract Wallet is
         uint256 _numOfConfirmRequired,
         address[] memory _gurdians,
         uint256 _threshold
-    ) public initializer {
+    ) public initializer _requireCalledByEntryPointOrWalletFactory {
         _initialize(
             _initialOwners,
             _numOfConfirmRequired,
@@ -325,15 +328,23 @@ contract Wallet is
             require(!txn[i].executed, "transaction has been executed");
             txn[i].executed = true;
         }
-        execute(txn);
+        executeT(txn);
         confirmedNumForTransactionId = 0;
         return true;
     }
 
-    function execute(Transaction[] memory txn) internal onlyOwners {
+    function executeT(Transaction[] memory txn) internal onlyOwners {
         for (uint256 i = 0; i < txn.length; i++) {
             _call(txn[i].to, txn[i].value, txn[i].data);
         }
+    }
+
+    function execute(
+        address _to,
+        uint256 _value,
+        bytes calldata _data
+    ) external _requireCalledByEntryPointOrWalletFactory {
+        _call(_to, _value, _data);
     }
 
     function getTransactionInfo(

@@ -7,7 +7,7 @@ import {Counter} from "src/Counter.sol";
 import {Wallet} from "src/wallet.sol";
 import {WalletFactory} from "src/walletFactory.sol";
 import {IEntryPoint} from "lib/account-abstraction/contracts/interfaces/IEntryPoint.sol";
-import {UserOperation} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
+import {UserOperation, UserOperationLib} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EntryPoint} from "lib/account-abstraction/contracts/core/EntryPoint.sol";
@@ -16,6 +16,7 @@ import {MyPaymaster} from "lib/ERC4337-sample/src/MyPaymaster.sol";
 contract Helper is Test {
     using ECDSA for bytes32;
     using MessageHashUtils for bytes32;
+    using UserOperationLib for UserOperation;
 
     uint256 constant ownersNum = 3;
     uint256 constant numOfConfirmRequired = 2;
@@ -23,8 +24,13 @@ contract Helper is Test {
     uint256 constant threshold = 2;
     uint256 constant salt = 1;
 
+    address bundler;
+
     address[] public owners = new address[](ownersNum);
+    uint256[] public ownerKeys = new uint256[](ownersNum);
+
     address[] public gurdians = new address[](gurdiansNum);
+    uint256[] public gurdianKeys = new uint256[](gurdiansNum);
 
     Wallet wallet;
     WalletFactory walletFactory;
@@ -34,22 +40,44 @@ contract Helper is Test {
 
     address alice = makeAddr("alice");
 
-    address Gurdian1 = makeAddr("Gurdian1");
-    address Gurdian2 = makeAddr("Gurdian2");
-    address Gurdian3 = makeAddr("Gurdian3");
-
-    address Owner1 = makeAddr("Owner1");
-    address Owner2 = makeAddr("Owner2");
-    address Owner3 = makeAddr("Owner3");
-
     function setUp() public virtual {
+        (address Gurdian1, uint256 gurdianPrivateKey1) = makeAddrAndKey(
+            "Gurdian1"
+        );
+        (address Gurdian2, uint256 gurdianPrivateKey2) = makeAddrAndKey(
+            "Gurdian2"
+        );
+        (address Gurdian3, uint256 gurdianPrivateKey3) = makeAddrAndKey(
+            "Gurdian3"
+        );
+
         gurdians[0] = Gurdian1;
         gurdians[1] = Gurdian2;
         gurdians[2] = Gurdian3;
 
+        gurdianKeys[0] = gurdianPrivateKey1;
+        gurdianKeys[1] = gurdianPrivateKey2;
+        gurdianKeys[2] = gurdianPrivateKey3;
+
+        vm.deal(gurdians[0], 20 ether);
+        vm.deal(gurdians[1], 20 ether);
+        vm.deal(gurdians[2], 20 ether);
+
+        (address Owner1, uint256 ownerPrivateKey1) = makeAddrAndKey("Owner1");
+        (address Owner2, uint256 ownerPrivateKey2) = makeAddrAndKey("Owner2");
+        (address Owner3, uint256 ownerPrivateKey3) = makeAddrAndKey("Owner3");
+
         owners[0] = Owner1;
         owners[1] = Owner2;
         owners[2] = Owner3;
+
+        ownerKeys[0] = ownerPrivateKey1;
+        ownerKeys[1] = ownerPrivateKey2;
+        ownerKeys[2] = ownerPrivateKey3;
+
+        vm.deal(owners[0], 20 ether);
+        vm.deal(owners[1], 20 ether);
+        vm.deal(owners[2], 20 ether);
 
         entryPoint = new EntryPoint();
 
@@ -94,5 +122,24 @@ contract Helper is Test {
         dataBatch[0] = abi.encodeCall(counter.increment, ());
         dataBatch[1] = abi.encodeCall(counter.increment, ());
         return (toBatch, valueBatch, dataBatch);
+    }
+
+    function createUserOp(
+        address sender
+    ) internal view returns (UserOperation memory) {
+        return
+            UserOperation({
+                sender: sender,
+                nonce: entryPoint.getNonce(sender, 0),
+                initCode: bytes(""),
+                callData: bytes(""),
+                callGasLimit: 600000,
+                verificationGasLimit: 1000000,
+                preVerificationGas: 10000,
+                maxFeePerGas: 10000000000,
+                maxPriorityFeePerGas: 2500000000,
+                paymasterAndData: bytes(""),
+                signature: bytes("")
+            });
     }
 }
