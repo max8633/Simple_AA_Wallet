@@ -10,7 +10,7 @@ import {IEntryPoint} from "lib/account-abstraction/contracts/interfaces/IEntryPo
 import {UserOperation, UserOperationLib} from "lib/account-abstraction/contracts/interfaces/UserOperation.sol";
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
-import {EntryPoint} from "src/util/EntryPoint.sol";
+import {EntryPoint} from "src/utils/EntryPoint.sol";
 
 // import {MyPaymaster} from "lib/ERC4337-sample/src/MyPaymaster.sol";
 

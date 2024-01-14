@@ -35,7 +35,8 @@ contract WalletTest is Helper {
         uint256 txnId = wallet.submitTransaction(
             toSingle,
             valueSingle,
-            dataSingle
+            dataSingle,
+            owners[0]
         );
         vm.stopPrank();
         assertEq(txnId, 1);
@@ -43,9 +44,7 @@ contract WalletTest is Helper {
         (
             address[] memory to,
             uint256[] memory value,
-            bytes[] memory data,
-            bool[] memory executed,
-            uint256[] memory transactionId
+            bytes[] memory data
         ) = wallet.getTransactionInfo(1);
 
         assertEq(to[0], address(counter));
@@ -60,11 +59,11 @@ contract WalletTest is Helper {
             uint256[] memory value,
             bytes[] memory data
         ) = singleTransactionSetUp();
-        uint256 txnId = wallet.submitTransaction(to, value, data);
+        uint256 txnId = wallet.submitTransaction(to, value, data, owners[0]);
         vm.stopPrank();
 
         vm.startPrank(owners[1]);
-        wallet.confirmTransaction(1);
+        wallet.confirmTransaction(owners[1], 1);
 
         uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
 
@@ -78,14 +77,14 @@ contract WalletTest is Helper {
             uint256[] memory value,
             bytes[] memory data
         ) = singleTransactionSetUp();
-        uint256 txnId = wallet.submitTransaction(to, value, data);
+        uint256 txnId = wallet.submitTransaction(to, value, data, owners[0]);
         vm.stopPrank();
 
         vm.prank(owners[1]);
-        wallet.confirmTransaction(1);
+        wallet.confirmTransaction(owners[1], 1);
 
         vm.startPrank(owners[2]);
-        wallet.confirmTransaction(1);
+        wallet.confirmTransaction(owners[2], 1);
 
         uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
         assertEq(confirmednum, 3);
@@ -106,7 +105,8 @@ contract WalletTest is Helper {
         uint256 txnId = wallet.submitTransaction(
             toBatch,
             valueBatch,
-            dataBatch
+            dataBatch,
+            owners[0]
         );
         vm.stopPrank();
         assertEq(txnId, 1);
@@ -114,9 +114,7 @@ contract WalletTest is Helper {
         (
             address[] memory to,
             uint256[] memory value,
-            bytes[] memory data,
-            bool[] memory executed,
-            uint256[] memory transactionId
+            bytes[] memory data
         ) = wallet.getTransactionInfo(1);
 
         assertEq(to[0], address(counter));
@@ -137,12 +135,13 @@ contract WalletTest is Helper {
         uint256 txnId = wallet.submitTransaction(
             toBatch,
             valueBatch,
-            dataBatch
+            dataBatch,
+            owners[0]
         );
         vm.stopPrank();
 
         vm.startPrank(owners[1]);
-        wallet.confirmTransaction(1);
+        wallet.confirmTransaction(owners[1], 1);
 
         uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
         assertEq(confirmednum, 2);
@@ -160,15 +159,16 @@ contract WalletTest is Helper {
         uint256 txnId = wallet.submitTransaction(
             toBatch,
             valueBatch,
-            dataBatch
+            dataBatch,
+            owners[0]
         );
         vm.stopPrank();
 
         vm.prank(owners[1]);
-        wallet.confirmTransaction(1);
+        wallet.confirmTransaction(owners[1], 1);
 
         vm.startPrank(owners[2]);
-        wallet.confirmTransaction(1);
+        wallet.confirmTransaction(owners[2], 1);
 
         uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
         assertEq(confirmednum, 3);
@@ -282,6 +282,7 @@ contract WalletTest is Helper {
         vm.prank(owners[2]);
         wallet.supportGurdianRemoval(gurdians[2]);
 
+        vm.prank(owners[2]);
         uint256 walletGurdiansLength = wallet.executeGurdianRemoval(
             gurdians[2]
         );
@@ -323,6 +324,8 @@ contract WalletTest is Helper {
         vm.prank(owners[2]);
 
         wallet.supportGurdianUpdate(gurdians[0], newGurdian);
+
+        vm.prank(owners[2]);
         address[] memory walletGurdians = wallet.executeGurdianUpdate(
             gurdians[0],
             newGurdian

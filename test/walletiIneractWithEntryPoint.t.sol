@@ -60,7 +60,7 @@ contract WalletInteractWithEntryPointTest is Helper {
         vm.stopPrank();
     }
 
-    function testCreateWallet() public {
+    function testEntryPointCreateWallet() public {
         //create UserOperation
         vm.startPrank(owners[0]);
         address sender = walletFactory.getAddress(
@@ -103,5 +103,136 @@ contract WalletInteractWithEntryPointTest is Helper {
         assertEq((Wallet(payable(sender))).isInitAlready(), true);
         //pay gas fee with ether we deposit before
         assertLt(entryPoint.balanceOf(address(sender)), 5 ether);
+    }
+
+    function testEntryPointSubmitTransaction() public {
+        //create UserOperation
+        vm.startPrank(owners[0]);
+        UserOperation memory ops = createUserOp(address(wallet));
+        (
+            address[] memory toSingle,
+            uint256[] memory valueSingle,
+            bytes[] memory dataSingle
+        ) = singleTransactionSetUp();
+
+        ops.callData = abi.encodeCall(
+            wallet.submitTransaction,
+            (toSingle, valueSingle, dataSingle, owners[0])
+        );
+
+        //sign
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerKeys[0], digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        //bundler send operation to entryPoint
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
+
+        (
+            address[] memory to,
+            uint256[] memory value,
+            bytes[] memory data
+        ) = wallet.getTransactionInfo(1);
+
+        assertEq(to[0], address(counter));
+        assertEq(value[0], 0);
+        assertEq(data[0], abi.encodeCall(counter.increment, ()));
+    }
+
+    function testEntryPointConfirmTransaction() public {
+        //create UserOperation of submit transaction
+        testEntryPointSubmitTransaction();
+        //create UserOperation of confirm transaction
+        vm.startPrank(owners[1]);
+        UserOperation memory ops = createUserOp(address(wallet));
+
+        ops.callData = abi.encodeCall(
+            wallet.confirmTransaction,
+            (owners[1], 1)
+        );
+
+        //sign
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerKeys[1], digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        //bundler send operation to entryPoint
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
+
+        uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
+        assertEq(confirmednum, 2);
+    }
+
+    function testExecuteTransactionFromEntryPoint() public {
+        //create UserOperation of submit transaction
+        testEntryPointSubmitTransaction();
+        //create UserOperation of confirm transaction
+        confirmEntryPointTransction(owners[1], ownerKeys[1]);
+        confirmEntryPointTransction(owners[2], ownerKeys[2]);
+
+        uint256 confirmednum = wallet.isTransactionConfirmedAlready(1);
+        assertEq(confirmednum, 3);
+
+        vm.startPrank(owners[1]);
+        UserOperation memory ops = createUserOp(address(wallet));
+
+        ops.callData = abi.encodeCall(wallet.executeTransaction, (1));
+
+        //sign
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerKeys[1], digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        //bundler send operation to entryPoint
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
+
+        assertEq(counter.number(), 1);
+        assertEq(address(counter).balance, 0);
+    }
+
+    function confirmEntryPointTransction(
+        address owner,
+        uint256 ownerKey
+    ) public {
+        vm.startPrank(owner);
+        UserOperation memory ops = createUserOp(address(wallet));
+
+        ops.callData = abi.encodeCall(wallet.confirmTransaction, (owner, 1));
+
+        //sign
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerKey, digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        //bundler send operation to entryPoint
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
     }
 }

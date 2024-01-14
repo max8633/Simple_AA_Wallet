@@ -10,7 +10,7 @@ import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECD
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Initializable} from "lib/openzeppelin-contracts/contracts/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "lib/openzeppelin-contracts/contracts/proxy/utils/UUPSUpgradeable.sol";
-import {TokenCallbackHandler} from "src/util/TokenCallBackHandler.sol";
+import {TokenCallbackHandler} from "src/utils/TokenCallBackHandler.sol";
 import {ReentrancyGuard} from "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 contract Wallet is
@@ -128,6 +128,22 @@ contract Wallet is
         _;
     }
 
+    modifier onlyOwnerOrEntryPoint() {
+        require(
+            isOwners[msg.sender] || msg.sender == address(_entryPoint),
+            "not owner or entryPoint"
+        );
+        _;
+    }
+
+    modifier onlyGurdianOrEntryPoint() {
+        require(
+            isGurdians[msg.sender] || msg.sender == address(_entryPoint),
+            "not owner or entryPoint"
+        );
+        _;
+    }
+
     modifier onlyOwners() {
         require(isOwners[msg.sender], "Only owner");
         _;
@@ -167,8 +183,6 @@ contract Wallet is
     ) internal view override returns (uint256) {
         bytes32 hash = userOpHash.toEthSignedMessageHash();
         address recOwner = hash.recover(userOp.signature);
-
-        console2.logBytes(userOp.signature);
 
         if (!isOwner(recOwner)) {
             return SIG_VALIDATION_FAILED;
@@ -244,12 +258,6 @@ contract Wallet is
         }
     }
 
-    function encodeSignatures(
-        bytes memory signatures
-    ) public pure returns (bytes memory) {
-        return abi.encode(signatures);
-    }
-
     function getDeposit() public view returns (uint256) {
         return entryPoint().balanceOf(address(this));
     }
@@ -267,8 +275,9 @@ contract Wallet is
     function submitTransaction(
         address[] calldata _to,
         uint256[] calldata _value,
-        bytes[] calldata _data
-    ) external onlyOwners returns (uint256 txnId) {
+        bytes[] calldata _data,
+        address owner
+    ) external onlyOwnerOrEntryPoint returns (uint256 txnId) {
         currentTransationNum++;
         for (uint256 i = 0; i < _to.length; i++) {
             require(_to[i] != address(0), "Invalid target address");
@@ -283,20 +292,23 @@ contract Wallet is
                 })
             );
         }
-        isConfirmed[currentTransationNum][msg.sender] = true;
+        isConfirmed[currentTransationNum][owner] = true;
         return currentTransationNum;
     }
 
-    function confirmTransaction(uint256 _transactionId) external onlyOwners {
+    function confirmTransaction(
+        address owner,
+        uint256 _transactionId
+    ) external onlyOwnerOrEntryPoint {
         require(
             _transactionId <= currentTransationNum,
             "Invalid transactionId"
         );
         require(
-            !isConfirmed[_transactionId][msg.sender],
+            !isConfirmed[_transactionId][owner],
             "already confirm transaction"
         );
-        isConfirmed[_transactionId][msg.sender] = true;
+        isConfirmed[_transactionId][owner] = true;
         confirmedNumForTransactionId++;
     }
 
@@ -304,7 +316,7 @@ contract Wallet is
 
     function isTransactionConfirmedAlready(
         uint256 _transactionId
-    ) external onlyOwners returns (uint256) {
+    ) external returns (uint256) {
         require(
             _transactionId <= currentTransationNum,
             "Invalid transaction Id"
@@ -320,7 +332,7 @@ contract Wallet is
 
     function executeTransaction(
         uint256 _transactionId
-    ) external onlyOwners returns (bool) {
+    ) external onlyOwnerOrEntryPoint returns (bool) {
         require(
             confirmedNumForTransactionId >= numOfConfirmRequired,
             "not enough confirm for the transaction"
@@ -339,7 +351,7 @@ contract Wallet is
         return true;
     }
 
-    function executeT(Transaction[] memory txn) internal onlyOwners {
+    function executeT(Transaction[] memory txn) internal onlyOwnerOrEntryPoint {
         for (uint256 i = 0; i < txn.length; i++) {
             _call(txn[i].to, txn[i].value, txn[i].data);
         }
@@ -349,23 +361,13 @@ contract Wallet is
         address _to,
         uint256 _value,
         bytes calldata _data
-    ) external _requireCalledByEntryPointOrWalletFactory {
+    ) external onlyOwnerOrEntryPoint {
         _call(_to, _value, _data);
     }
 
     function getTransactionInfo(
         uint256 _transactionId
-    )
-        public
-        view
-        returns (
-            address[] memory,
-            uint256[] memory,
-            bytes[] memory,
-            bool[] memory,
-            uint256[] memory
-        )
-    {
+    ) public view returns (address[] memory, uint256[] memory, bytes[] memory) {
         require(
             _transactionId <= currentTransationNum,
             "Invalid transaction Id"
@@ -375,16 +377,13 @@ contract Wallet is
         address[] memory to = new address[](txnLength);
         uint256[] memory value = new uint256[](txnLength);
         bytes[] memory data = new bytes[](txnLength);
-        bool[] memory executed = new bool[](txnLength);
-        uint256[] memory transactionId = new uint256[](txnLength);
+
         for (uint256 i = 0; i < txn.length; i++) {
             to[i] = txn[i].to;
             value[i] = txn[i].value;
             data[i] = txn[i].data;
-            executed[i] = txn[i].executed;
-            transactionId[i] = txn[i].transactionId;
         }
-        return (to, value, data, executed, transactionId);
+        return (to, value, data);
     }
 
     /*
@@ -394,7 +393,7 @@ contract Wallet is
     function initialRecovery(
         address oldOwner,
         address newOwner
-    ) external onlyGurdians notInRecovery {
+    ) external onlyGurdianOrEntryPoint notInRecovery {
         require(isOwners[oldOwner], "not in owner list");
         require(!isOwners[newOwner], "already in owner list");
         require(!isGurdians[newOwner], "cant not be the gurdians");
@@ -416,7 +415,7 @@ contract Wallet is
     function supportRecovery(
         address oldOwner,
         address newOwner
-    ) external onlyGurdians onlyInRecovery {
+    ) external onlyGurdianOrEntryPoint onlyInRecovery {
         require(isOwners[oldOwner], "not in owner list");
         require(!isOwners[newOwner], "already in owner list");
         require(!isGurdians[newOwner], "cant not be the gurdians");
@@ -437,7 +436,7 @@ contract Wallet is
         );
     }
 
-    function cancelRecovery() external onlyOwners onlyInRecovery {
+    function cancelRecovery() external onlyOwnerOrEntryPoint onlyInRecovery {
         isRecovery = false;
     }
 
@@ -445,7 +444,12 @@ contract Wallet is
         address oldOwner,
         address newOwner,
         address[] calldata gurdiansList
-    ) external onlyGurdians onlyInRecovery returns (address[] memory) {
+    )
+        external
+        onlyGurdianOrEntryPoint
+        onlyInRecovery
+        returns (address[] memory)
+    {
         require(
             block.timestamp > executeRecoveryTimestamp[currentRecoveryRound],
             "not the time to execute recovery"
@@ -487,7 +491,7 @@ contract Wallet is
 
     function initiateGurdianRemoval(
         address gurdianToRemoval
-    ) external onlyOwners notInRecovery notInGurdianUpdate {
+    ) external onlyOwnerOrEntryPoint notInRecovery notInGurdianUpdate {
         require(gurdians.length - 1 >= threshold, "beyond threshold");
         require(
             gurdianToRemoval != address(0),
@@ -502,7 +506,7 @@ contract Wallet is
 
     function supportGurdianRemoval(
         address gurdianToRemoval
-    ) external onlyOwners notInRecovery {
+    ) external onlyOwnerOrEntryPoint notInRecovery {
         isSupport[msg.sender][gurdianToRemoval] = true;
 
         for (uint256 i = 0; i < owners.length; i++) {
@@ -521,7 +525,7 @@ contract Wallet is
 
     function executeGurdianRemoval(
         address gurdianToRemoval
-    ) public returns (uint256) {
+    ) public onlyOwnerOrEntryPoint returns (uint256) {
         isGurdians[gurdianToRemoval] = false;
         for (uint256 i = 0; i < gurdians.length; i++) {
             if (gurdians[i] == gurdianToRemoval) {
@@ -536,7 +540,7 @@ contract Wallet is
     function initiateGurdianUpdate(
         address oldGurdian,
         address newGurdian
-    ) external onlyOwners notInRecovery notInGurdianUpdate {
+    ) external onlyOwnerOrEntryPoint notInRecovery notInGurdianUpdate {
         require(
             oldGurdian != address(0) && newGurdian != address(0),
             "Invalid address"
@@ -553,7 +557,7 @@ contract Wallet is
     function supportGurdianUpdate(
         address oldGurdian,
         address newGurdian
-    ) external onlyOwners notInRecovery {
+    ) external onlyOwnerOrEntryPoint notInRecovery {
         isSupport[msg.sender][oldGurdian] = true;
         supportToGurdianUpdate++;
     }
@@ -561,7 +565,7 @@ contract Wallet is
     function executeGurdianUpdate(
         address oldGurdian,
         address newGurdian
-    ) external returns (address[] memory) {
+    ) external onlyOwnerOrEntryPoint returns (address[] memory) {
         isGurdians[oldGurdian] = false;
         if (
             supportToGurdianUpdate == owners.length &&
