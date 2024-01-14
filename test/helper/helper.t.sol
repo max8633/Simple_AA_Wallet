@@ -11,6 +11,9 @@ import {UserOperation, UserOperationLib} from "lib/account-abstraction/contracts
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EntryPoint} from "src/utils/EntryPoint.sol";
+import {TestERC20} from "src/token/TestERC20.sol";
+import {TestERC721} from "src/token/TestERC721.sol";
+import {TestERC1155} from "src/token/TestERC1155.sol";
 
 // import {MyPaymaster} from "lib/ERC4337-sample/src/MyPaymaster.sol";
 
@@ -39,6 +42,9 @@ contract Helper is Test {
     WalletFactory walletFactory;
     EntryPoint entryPoint;
     Counter counter;
+    TestERC20 TestErc20;
+    TestERC721 TestErc721;
+    TestERC1155 TestErc1155;
     // MyPaymaster myPaymaster;
 
     address alice = makeAddr("alice");
@@ -98,6 +104,9 @@ contract Helper is Test {
 
         // myPaymaster = new MyPaymaster(IEntryPoint(address(entryPoint)));
         counter = new Counter();
+        TestErc20 = new TestERC20();
+        TestErc721 = new TestERC721();
+        TestErc1155 = new TestERC1155();
     }
 
     function singleTransactionSetUp()

@@ -335,4 +335,40 @@ contract WalletTest is Helper {
         assertEq(walletGurdians[0], newGurdian);
         assertEq(wallet.isGurdian(newGurdian), true);
     }
+
+    function testReceiveERC20() public {
+        vm.startPrank(alice);
+        TestErc20.mint(alice, 10);
+        assertEq(TestErc20.balanceOf(alice), 10);
+        TestErc20.transfer(address(wallet), 5);
+        assertEq(TestErc20.balanceOf(alice), 5);
+        assertEq(TestErc20.balanceOf(address(wallet)), 5);
+    }
+
+    function testReceiveERC721() public {
+        vm.startPrank(alice);
+        uint256 tokenId = 0;
+        TestErc721.mint(alice, tokenId);
+        assertEq(TestErc721.balanceOf(alice), 1);
+        TestErc721.safeTransferFrom(alice, address(wallet), tokenId);
+        assertEq(TestErc721.balanceOf(alice), 0);
+        assertEq(TestErc721.balanceOf(address(wallet)), 1);
+    }
+
+    function testReceiveERC1155() public {
+        vm.startPrank(alice);
+        uint256 tokenId = 0;
+        uint256 amount = 1;
+        TestErc1155.mint(alice, tokenId, amount, "");
+        assertEq(TestErc1155.balanceOf(alice, tokenId), 1);
+        TestErc1155.safeTransferFrom(
+            alice,
+            address(wallet),
+            tokenId,
+            amount,
+            ""
+        );
+        assertEq(TestErc1155.balanceOf(alice, tokenId), 0);
+        assertEq(TestErc1155.balanceOf(address(wallet), tokenId), 1);
+    }
 }
