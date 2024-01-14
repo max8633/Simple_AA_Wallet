@@ -22,16 +22,13 @@ contract WalletInteractWithEntryPointTest is Helper {
         bundler = makeAddr("bundler");
         vm.deal(bundler, 20 ether);
         vm.deal(address(entryPoint), 20 ether);
-        console2.log(address(entryPoint).balance);
+        console2.log("entrypoint: ", address(entryPoint).balance);
 
         vm.startPrank(owners[0]);
         entryPoint.depositTo{value: 20 ether}(address(wallet));
         assertEq(entryPoint.balanceOf(address(wallet)), 20 ether);
-        console2.log(entryPoint.balanceOf(address(wallet)));
+        console2.log("wallet: ", entryPoint.balanceOf(address(wallet)));
 
-        // wallet.addDeposit{value: 10 ether}();
-        // console2.log("value: ", wallet.getDeposit());
-        // assertEq(wallet.getDeposit(), 10 ether);
         vm.stopPrank();
     }
 
@@ -60,5 +57,6 @@ contract WalletInteractWithEntryPointTest is Helper {
         entryPoint.handleOps(userOps, payable(bundler));
 
         assertEq(alice.balance, 1 ether);
+        vm.stopPrank();
     }
 }

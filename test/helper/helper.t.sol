@@ -11,7 +11,8 @@ import {UserOperation, UserOperationLib} from "lib/account-abstraction/contracts
 import {ECDSA} from "lib/openzeppelin-contracts/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "lib/openzeppelin-contracts/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EntryPoint} from "lib/account-abstraction/contracts/core/EntryPoint.sol";
-import {MyPaymaster} from "lib/ERC4337-sample/src/MyPaymaster.sol";
+
+// import {MyPaymaster} from "lib/ERC4337-sample/src/MyPaymaster.sol";
 
 contract Helper is Test {
     using ECDSA for bytes32;
@@ -36,7 +37,7 @@ contract Helper is Test {
     WalletFactory walletFactory;
     EntryPoint entryPoint;
     Counter counter;
-    MyPaymaster myPaymaster;
+    // MyPaymaster myPaymaster;
 
     address alice = makeAddr("alice");
 
@@ -89,9 +90,11 @@ contract Helper is Test {
             threshold,
             salt
         );
+        vm.deal(address(wallet), 20 ether);
+        assertEq(address(wallet).balance, 20 ether);
         assertEq(wallet.numOfConfirmRequired(), numOfConfirmRequired);
 
-        myPaymaster = new MyPaymaster(IEntryPoint(address(entryPoint)));
+        // myPaymaster = new MyPaymaster(IEntryPoint(address(entryPoint)));
         counter = new Counter();
     }
 
@@ -130,14 +133,14 @@ contract Helper is Test {
         return
             UserOperation({
                 sender: sender,
-                nonce: entryPoint.getNonce(sender, 0),
+                nonce: wallet.getNonce(),
                 initCode: bytes(""),
                 callData: bytes(""),
-                callGasLimit: 600000,
-                verificationGasLimit: 1000000,
-                preVerificationGas: 10000,
-                maxFeePerGas: 10000000000,
-                maxPriorityFeePerGas: 2500000000,
+                callGasLimit: 1_000_000_000,
+                verificationGasLimit: 1_000_000_000_000,
+                preVerificationGas: 1_000_000_000_000,
+                maxFeePerGas: 10_000_000_000_000,
+                maxPriorityFeePerGas: 2_500_000_000_000,
                 paymasterAndData: bytes(""),
                 signature: bytes("")
             });

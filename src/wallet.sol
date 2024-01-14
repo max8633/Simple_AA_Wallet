@@ -168,12 +168,15 @@ contract Wallet is
 
         for (uint256 i = 0; i < signatures.length; i++) {
             address recOwner = hash.recover(signatures[i]);
-            for (uint256 j = 0; j < owners.length; j++) {
-                if (owners[i] == recOwner) return 0;
+            if (!isOwner(recOwner)) {
+                return SIG_VALIDATION_FAILED;
             }
-            // if (owners[i] != hash.recover(signatures[i]))
-            return SIG_VALIDATION_FAILED;
+            return 0;
         }
+    }
+
+    function _validateNonce(uint256 _nonce) internal view virtual override {
+        require(_nonce < type(uint64).max);
     }
 
     function initialize(
