@@ -6,4 +6,17 @@
 ## features
 1. ERC-4337 
 2. MultiSig
-4. Social Recovery
+3. Social Recovery
+
+## SetUp
+```shell
+git clone https://github.com/max8633/Simple_AA_Wallet.git
+cd Simple_AA_Wallet
+forge build
+forge test
+```
+
+## testing
+'- wallet.t.sol：直接與wallet合約互動，測試function功能'
+'- walletInteractWithEntryPoint.t.sol：測試透過entryPoint與wallet合約互動'
+
