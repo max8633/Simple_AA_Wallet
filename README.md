@@ -17,6 +17,6 @@ forge test
 ```
 
 ## testing
-'- wallet.t.sol：直接與wallet合約互動，測試function功能'
-'- walletInteractWithEntryPoint.t.sol：測試透過entryPoint與wallet合約互動'
+- `wallet.t.sol`：直接與wallet合約互動，測試function功能
+- `walletInteractWithEntryPoint.t.sol`：測試透過entryPoint與wallet合約互動
 
