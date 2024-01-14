@@ -21,7 +21,7 @@ contract WalletTest is Helper {
         require(success, "transfer ether failed");
         vm.stopPrank();
 
-        assertEq(address(wallet).balance, 1 ether);
+        assertEq(address(wallet).balance, INIT_BALANCE + 1 ether);
         assertEq(alice.balance, 0);
     }
 

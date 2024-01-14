@@ -25,6 +25,8 @@ contract Helper is Test {
     uint256 constant threshold = 2;
     uint256 constant salt = 1;
 
+    uint256 constant INIT_BALANCE = 20 ether;
+
     address bundler;
 
     address[] public owners = new address[](ownersNum);
@@ -60,9 +62,9 @@ contract Helper is Test {
         gurdianKeys[1] = gurdianPrivateKey2;
         gurdianKeys[2] = gurdianPrivateKey3;
 
-        vm.deal(gurdians[0], 20 ether);
-        vm.deal(gurdians[1], 20 ether);
-        vm.deal(gurdians[2], 20 ether);
+        vm.deal(gurdians[0], INIT_BALANCE);
+        vm.deal(gurdians[1], INIT_BALANCE);
+        vm.deal(gurdians[2], INIT_BALANCE);
 
         (address Owner1, uint256 ownerPrivateKey1) = makeAddrAndKey("Owner1");
         (address Owner2, uint256 ownerPrivateKey2) = makeAddrAndKey("Owner2");
@@ -76,9 +78,9 @@ contract Helper is Test {
         ownerKeys[1] = ownerPrivateKey2;
         ownerKeys[2] = ownerPrivateKey3;
 
-        vm.deal(owners[0], 20 ether);
-        vm.deal(owners[1], 20 ether);
-        vm.deal(owners[2], 20 ether);
+        vm.deal(owners[0], INIT_BALANCE);
+        vm.deal(owners[1], INIT_BALANCE);
+        vm.deal(owners[2], INIT_BALANCE);
 
         entryPoint = new EntryPoint();
 
@@ -90,8 +92,8 @@ contract Helper is Test {
             threshold,
             salt
         );
-        vm.deal(address(wallet), 20 ether);
-        assertEq(address(wallet).balance, 20 ether);
+        vm.deal(address(wallet), INIT_BALANCE);
+        assertEq(address(wallet).balance, INIT_BALANCE);
         assertEq(wallet.numOfConfirmRequired(), numOfConfirmRequired);
 
         // myPaymaster = new MyPaymaster(IEntryPoint(address(entryPoint)));
