@@ -20,13 +20,13 @@ contract WalletInteractWithEntryPointTest is Helper {
         super.setUp();
 
         bundler = makeAddr("bundler");
-        vm.deal(bundler, 20 ether);
-        vm.deal(address(entryPoint), 20 ether);
+        vm.deal(bundler, 100 ether);
+        vm.deal(address(entryPoint), 100 ether);
         console2.log("entrypoint: ", address(entryPoint).balance);
 
         vm.startPrank(owners[0]);
-        entryPoint.depositTo{value: 20 ether}(address(wallet));
-        assertEq(entryPoint.balanceOf(address(wallet)), 20 ether);
+        entryPoint.depositTo{value: 10 ether}(address(wallet));
+        assertEq(entryPoint.balanceOf(address(wallet)), 10 ether);
         console2.log("wallet: ", entryPoint.balanceOf(address(wallet)));
 
         vm.stopPrank();
@@ -58,5 +58,50 @@ contract WalletInteractWithEntryPointTest is Helper {
 
         assertEq(alice.balance, 1 ether);
         vm.stopPrank();
+    }
+
+    function testCreateWallet() public {
+        //create UserOperation
+        vm.startPrank(owners[0]);
+        address sender = walletFactory.getAddress(
+            owners,
+            numOfConfirmRequired,
+            gurdians,
+            threshold,
+            5
+        );
+        bytes memory initData = abi.encodeCall(
+            walletFactory.createAccount,
+            (owners, numOfConfirmRequired, gurdians, threshold, 5)
+        );
+
+        UserOperation memory ops = createUserOp(sender);
+        ops.initCode = abi.encodePacked(address(walletFactory), initData);
+        ops.callData = abi.encodeCall(
+            wallet.execute,
+            (alice, 1 ether, bytes(""))
+        );
+
+        //sign
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerKeys[0], digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        entryPoint.depositTo{value: 5 ether}(sender);
+        assertEq(entryPoint.balanceOf(sender), 5 ether);
+
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
+
+        //check do initialize already
+        assertEq((Wallet(payable(sender))).isInitAlready(), true);
+        //pay gas fee with ether we deposit before
+        assertLt(entryPoint.balanceOf(address(sender)), 5 ether);
     }
 }

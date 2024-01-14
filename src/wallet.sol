@@ -17,7 +17,7 @@ contract Wallet is
     BaseAccount,
     Initializable,
     UUPSUpgradeable,
-    TokenCallbackHandler,
+    // TokenCallbackHandler,
     ReentrancyGuard
 {
     using ECDSA for bytes32;
@@ -34,6 +34,8 @@ contract Wallet is
 
     //@notice store the least num need to confirm
     uint256 public numOfConfirmRequired;
+
+    bool public isInitAlready;
 
     //@notice stor the info of transaction
     struct Transaction {
@@ -164,15 +166,14 @@ contract Wallet is
         bytes32 userOpHash
     ) internal view override returns (uint256) {
         bytes32 hash = userOpHash.toEthSignedMessageHash();
-        bytes[] memory signatures = abi.decode(userOp.signature, (bytes[]));
+        address recOwner = hash.recover(userOp.signature);
 
-        for (uint256 i = 0; i < signatures.length; i++) {
-            address recOwner = hash.recover(signatures[i]);
-            if (!isOwner(recOwner)) {
-                return SIG_VALIDATION_FAILED;
-            }
-            return 0;
+        console2.logBytes(userOp.signature);
+
+        if (!isOwner(recOwner)) {
+            return SIG_VALIDATION_FAILED;
         }
+        return 0;
     }
 
     function _validateNonce(uint256 _nonce) internal view virtual override {
@@ -220,6 +221,8 @@ contract Wallet is
         numOfConfirmRequired = _numOfConfirmRequired;
 
         threshold = _threshold;
+
+        isInitAlready = true;
 
         emit WalletInitialized(
             _entryPoint,

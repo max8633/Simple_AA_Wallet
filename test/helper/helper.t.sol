@@ -136,11 +136,11 @@ contract Helper is Test {
                 nonce: wallet.getNonce(),
                 initCode: bytes(""),
                 callData: bytes(""),
-                callGasLimit: 1_000_000_000,
-                verificationGasLimit: 1_000_000_000_000,
-                preVerificationGas: 1_000_000_000_000,
-                maxFeePerGas: 10_000_000_000_000,
-                maxPriorityFeePerGas: 2_500_000_000_000,
+                callGasLimit: 1_000_000,
+                verificationGasLimit: 1_000_000,
+                preVerificationGas: 1_000_000,
+                maxFeePerGas: 10_000_000_000,
+                maxPriorityFeePerGas: 2_500_000_000,
                 paymasterAndData: bytes(""),
                 signature: bytes("")
             });
