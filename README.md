@@ -7,6 +7,7 @@
 1. ERC-4337 
 2. MultiSig
 3. Social Recovery
+- with update owners, gurdians features
 
 ## SetUp
 ```shell
