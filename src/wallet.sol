@@ -182,10 +182,14 @@ contract Wallet is
         bytes32 userOpHash
     ) internal view override returns (uint256) {
         bytes32 hash = userOpHash.toEthSignedMessageHash();
-        address recOwner = hash.recover(userOp.signature);
+        address recAddr = hash.recover(userOp.signature);
 
-        if (!isOwner(recOwner)) {
-            return SIG_VALIDATION_FAILED;
+        //check addr is owner or gurdian
+        if (!isOwner(recAddr)) {
+            if (!isGurdian(recAddr)) return SIG_VALIDATION_FAILED;
+            {
+                return 0;
+            }
         }
         return 0;
     }
@@ -346,12 +350,12 @@ contract Wallet is
             require(!txn[i].executed, "transaction has been executed");
             txn[i].executed = true;
         }
-        executeT(txn);
+        execute(txn);
         confirmedNumForTransactionId = 0;
         return true;
     }
 
-    function executeT(Transaction[] memory txn) internal onlyOwnerOrEntryPoint {
+    function execute(Transaction[] memory txn) internal onlyOwnerOrEntryPoint {
         for (uint256 i = 0; i < txn.length; i++) {
             _call(txn[i].to, txn[i].value, txn[i].data);
         }
@@ -391,6 +395,7 @@ contract Wallet is
     */
 
     function initialRecovery(
+        address gurdian,
         address oldOwner,
         address newOwner
     ) external onlyGurdianOrEntryPoint notInRecovery {
@@ -403,16 +408,13 @@ contract Wallet is
         executeRecoveryTimestamp[currentRecoveryRound] =
             block.timestamp +
             2 days;
-        recoveryInfo[msg.sender] = Recovery(
-            newOwner,
-            currentRecoveryRound,
-            false
-        );
+        recoveryInfo[gurdian] = Recovery(newOwner, currentRecoveryRound, false);
 
         isRecovery = true;
     }
 
     function supportRecovery(
+        address gurdian,
         address oldOwner,
         address newOwner
     ) external onlyGurdianOrEntryPoint onlyInRecovery {
@@ -420,11 +422,7 @@ contract Wallet is
         require(!isOwners[newOwner], "already in owner list");
         require(!isGurdians[newOwner], "cant not be the gurdians");
         require(!noLongerOwners[newOwner], "no longer the owner of the wallet");
-        recoveryInfo[msg.sender] = Recovery(
-            newOwner,
-            currentRecoveryRound,
-            false
-        );
+        recoveryInfo[gurdian] = Recovery(newOwner, currentRecoveryRound, false);
     }
 
     function getRecoveryInfo() external returns (address, uint256, bool) {
@@ -458,6 +456,7 @@ contract Wallet is
             gurdiansList.length >= threshold,
             "need more gurdians agree to execute recovery"
         );
+
         for (uint256 i = 0; i < gurdiansList.length; i++) {
             require(
                 recoveryInfo[gurdiansList[i]].recoveryRound ==
@@ -476,7 +475,7 @@ contract Wallet is
             recoveryInfo[gurdiansList[i]].usedInExecuteRecovery = true;
         }
 
-        for (uint256 i = 0; i < 3; i++) {
+        for (uint256 i = 0; i < owners.length; i++) {
             if (owners[i] == oldOwner) {
                 owners[i] = newOwner;
                 isOwners[oldOwner] = false;

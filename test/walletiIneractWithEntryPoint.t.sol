@@ -211,6 +211,108 @@ contract WalletInteractWithEntryPointTest is Helper {
         assertEq(address(counter).balance, 0);
     }
 
+    function testEntryPointInitiateRecovery() public {
+        vm.startPrank(gurdians[0]);
+        UserOperation memory ops = createUserOp(address(wallet));
+
+        ops.callData = abi.encodeCall(
+            wallet.initialRecovery,
+            (gurdians[0], owners[0], alice)
+        );
+
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(gurdianKeys[0], digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        //bundler send operation to entryPoint
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
+
+        assertEq(wallet.currentRecoveryRound(), 1);
+        assertEq(wallet.isRecovery(), true);
+    }
+
+    function testEntryPointSupportRecovery() public {
+        testEntryPointInitiateRecovery();
+
+        vm.startPrank(gurdians[1]);
+
+        UserOperation memory ops = createUserOp(address(wallet));
+        ops.callData = abi.encodeCall(
+            wallet.supportRecovery,
+            (gurdians[1], owners[0], alice)
+        );
+
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(gurdianKeys[1], digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        //bundler send operation to entryPoint
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
+
+        vm.startPrank(gurdians[0]);
+
+        (
+            address newOwnerAddr,
+            uint256 recoveryRound,
+            bool usedInExecuteRecovery
+        ) = wallet.getRecoveryInfo();
+
+        assertEq(newOwnerAddr, alice);
+        assertEq(recoveryRound, 1);
+        assertEq(usedInExecuteRecovery, false);
+    }
+
+    function testEntryPointExecuteRecovery() public {
+        testEntryPointInitiateRecovery();
+        supportRecovery(gurdians[1], gurdianKeys[1]);
+        supportRecovery(gurdians[2], gurdianKeys[2]);
+
+        vm.warp(block.timestamp + 5 days);
+
+        vm.startPrank(gurdians[1]);
+
+        UserOperation memory ops = createUserOp(address(wallet));
+        ops.callData = abi.encodeCall(
+            wallet.executeRecovery,
+            (owners[0], alice, gurdians)
+        );
+
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(gurdianKeys[1], digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
+
+        // assertEq(newOwners[0], alice);
+        assertEq(wallet.isRecovery(), false);
+        assertEq(wallet.isOwner(alice), true);
+    }
+
+    /*
+    utils
+    */
+
     function confirmEntryPointTransction(
         address owner,
         uint256 ownerKey
@@ -224,6 +326,30 @@ contract WalletInteractWithEntryPointTest is Helper {
         bytes32 userOpHash = entryPoint.getUserOpHash(ops);
         bytes32 digest = userOpHash.toEthSignedMessageHash();
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(ownerKey, digest);
+        ops.signature = abi.encodePacked(r, s, v);
+        vm.stopPrank();
+
+        UserOperation[] memory userOps;
+        userOps = new UserOperation[](1);
+        userOps[0] = ops;
+
+        //bundler send operation to entryPoint
+        vm.prank(bundler);
+        entryPoint.handleOps(userOps, payable(bundler));
+    }
+
+    function supportRecovery(address gurdian, uint256 gurdianKey) public {
+        vm.startPrank(gurdians[1]);
+
+        UserOperation memory ops = createUserOp(address(wallet));
+        ops.callData = abi.encodeCall(
+            wallet.supportRecovery,
+            (gurdian, owners[0], alice)
+        );
+
+        bytes32 userOpHash = entryPoint.getUserOpHash(ops);
+        bytes32 digest = userOpHash.toEthSignedMessageHash();
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(gurdianKey, digest);
         ops.signature = abi.encodePacked(r, s, v);
         vm.stopPrank();
 

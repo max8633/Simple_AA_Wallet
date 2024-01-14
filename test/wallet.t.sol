@@ -182,7 +182,7 @@ contract WalletTest is Helper {
     function testInitiateRecovery() public {
         address newOwner = makeAddr("newOwner");
         vm.startPrank(gurdians[0]);
-        wallet.initialRecovery(owners[0], newOwner);
+        wallet.initialRecovery(gurdians[0], owners[0], newOwner);
         vm.stopPrank();
 
         assertEq(wallet.currentRecoveryRound(), 1);
@@ -192,10 +192,10 @@ contract WalletTest is Helper {
     function testSupportRecovery() public {
         address newOwner = makeAddr("newOwner");
         vm.prank(gurdians[0]);
-        wallet.initialRecovery(owners[0], newOwner);
+        wallet.initialRecovery(gurdians[0], owners[0], newOwner);
 
         vm.startPrank(gurdians[1]);
-        wallet.supportRecovery(owners[0], newOwner);
+        wallet.supportRecovery(gurdians[1], owners[0], newOwner);
 
         (
             address newOwnerAddr,
@@ -212,13 +212,13 @@ contract WalletTest is Helper {
     function testExecuteRecovery() public {
         address newOwner = makeAddr("newOwner");
         vm.prank(gurdians[0]);
-        wallet.initialRecovery(owners[0], newOwner);
+        wallet.initialRecovery(gurdians[0], owners[0], newOwner);
 
         vm.prank(gurdians[1]);
-        wallet.supportRecovery(owners[0], newOwner);
+        wallet.supportRecovery(gurdians[1], owners[0], newOwner);
 
         vm.prank(gurdians[2]);
-        wallet.supportRecovery(owners[0], newOwner);
+        wallet.supportRecovery(gurdians[2], owners[0], newOwner);
 
         vm.warp(block.timestamp + 5 days);
 
@@ -237,7 +237,7 @@ contract WalletTest is Helper {
     function testCancelRecovery() public {
         address newOwner = makeAddr("newOwner");
         vm.startPrank(gurdians[0]);
-        wallet.initialRecovery(owners[0], newOwner);
+        wallet.initialRecovery(gurdians[0], owners[0], newOwner);
         assertEq(wallet.isRecovery(), true);
         vm.stopPrank();
 
@@ -248,7 +248,7 @@ contract WalletTest is Helper {
 
         vm.startPrank(gurdians[1]);
         vm.expectRevert();
-        wallet.supportRecovery(owners[0], newOwner);
+        wallet.supportRecovery(gurdians[1], owners[0], newOwner);
         vm.stopPrank();
     }
 
